@@ -1,0 +1,129 @@
+import { authTables } from "@convex-dev/auth/server";
+import { defineSchema, defineTable } from "convex/server";
+import { Infer, v } from "convex/values";
+
+// default user roles. can add / remove based on the project as needed
+export const ROLES = {
+  ADMIN: "admin",
+  USER: "user",
+  MEMBER: "member",
+} as const;
+
+export const roleValidator = v.union(
+  v.literal(ROLES.ADMIN),
+  v.literal(ROLES.USER),
+  v.literal(ROLES.MEMBER),
+);
+export type Role = Infer<typeof roleValidator>;
+
+export const programStatus = v.union(
+  v.literal("published"),
+  v.literal("draft"),
+);
+
+export const orderStatus = v.union(
+  v.literal("paid"),
+  v.literal("refunded"),
+);
+
+export const bookingStatus = v.union(
+  v.literal("upcoming"),
+  v.literal("cancelled"),
+);
+
+const schema = defineSchema(
+  {
+    // default auth tables using convex auth.
+    ...authTables, // do not remove or modify
+
+    // the users table is the default users table that is brought in by the authTables
+    users: defineTable({
+      name: v.optional(v.string()), // name of the user. do not remove
+      image: v.optional(v.string()), // image of the user. do not remove
+      email: v.optional(v.string()), // email of the user. do not remove
+      emailVerificationTime: v.optional(v.number()), // email verification time. do not remove
+      isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
+
+      role: v.optional(roleValidator), // role of the user. do not remove
+    }).index("email", ["email"]), // index for the email. do not remove or modify
+
+    // add other tables here
+
+    // Private study programs — the item catalog.
+    programs: defineTable({
+      title: v.string(),
+      discipline: v.string(),
+      level: v.string(),
+      priceCents: v.number(),
+      summary: v.string(),
+      description: v.string(),
+      instructor: v.string(),
+      sessionCount: v.number(),
+      durationMinutes: v.number(),
+      tags: v.array(v.string()),
+      status: programStatus,
+    })
+      .index("discipline", ["discipline"])
+      .index("status", ["status"]),
+
+    // Checkout records for program purchases.
+    orders: defineTable({
+      userId: v.id("users"),
+      programId: v.id("programs"),
+      amountCents: v.number(),
+      status: orderStatus,
+      cardLast4: v.string(),
+    })
+      .index("userId", ["userId"])
+      .index("programId", ["programId"]),
+
+    // Access granted once an order is paid.
+    enrollments: defineTable({
+      userId: v.id("users"),
+      programId: v.id("programs"),
+    })
+      .index("userId", ["userId"])
+      .index("programId_userId", ["programId", "userId"]),
+
+    // Member-posted study notes.
+    notes: defineTable({
+      userId: v.id("users"),
+      programId: v.id("programs"),
+      title: v.string(),
+      body: v.string(),
+    }).index("programId", ["programId"]),
+
+    // Replies on a study note.
+    noteComments: defineTable({
+      noteId: v.id("notes"),
+      userId: v.id("users"),
+      body: v.string(),
+    }).index("noteId", ["noteId"]),
+
+    // One-on-one tutor sessions members can book.
+    bookings: defineTable({
+      userId: v.id("users"),
+      tutorName: v.string(),
+      topic: v.string(),
+      startsAt: v.number(),
+      status: bookingStatus,
+    }).index("userId", ["userId"]),
+
+    // Direct member-to-member messages.
+    conversations: defineTable({
+      participantIds: v.array(v.id("users")),
+      sortedParticipantIds: v.array(v.id("users")),
+    }).index("byPair", ["sortedParticipantIds"]),
+
+    messages: defineTable({
+      conversationId: v.id("conversations"),
+      senderId: v.id("users"),
+      body: v.string(),
+    }).index("conversationId", ["conversationId"]),
+  },
+  {
+    schemaValidation: false,
+  },
+);
+
+export default schema;
