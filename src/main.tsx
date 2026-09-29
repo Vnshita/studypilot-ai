@@ -21,6 +21,7 @@ const Catalog = lazy(() => import("./pages/Catalog.tsx"));
 const Library = lazy(() => import("./pages/Library.tsx"));
 const ProgramDetail = lazy(() => import("./pages/ProgramDetail.tsx"));
 const Checkout = lazy(() => import("./pages/Checkout.tsx"));
+const CheckoutReturn = lazy(() => import("./pages/CheckoutReturn.tsx"));
 const Community = lazy(() => import("./pages/Community.tsx"));
 const Messages = lazy(() => import("./pages/Messages.tsx"));
 const BookSession = lazy(() => import("./pages/BookSession.tsx"));
@@ -172,6 +173,14 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <RequireAuth>
                     <Checkout />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/checkout/return"
+                element={
+                  <RequireAuth>
+                    <CheckoutReturn />
                   </RequireAuth>
                 }
               />

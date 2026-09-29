@@ -22,6 +22,7 @@ export const programStatus = v.union(
 );
 
 export const orderStatus = v.union(
+  v.literal("pending"), // checkout session opened, awaiting Stripe confirmation
   v.literal("paid"),
   v.literal("refunded"),
 );
@@ -102,7 +103,12 @@ const schema = defineSchema(
       programId: v.id("programs"),
       amountCents: v.number(),
       status: orderStatus,
-      cardLast4: v.string(),
+      // Simulated orders store the card's last 4; Stripe orders leave it unset.
+      cardLast4: v.optional(v.string()),
+
+      // Stripe checkout session and, once confirmed, the payment intent.
+      stripeSessionId: v.optional(v.string()),
+      stripePaymentIntentId: v.optional(v.string()),
 
       // Teacher pay, stamped at checkout when a teacher is assigned.
       teacherId: v.optional(v.id("users")),
@@ -111,7 +117,8 @@ const schema = defineSchema(
     })
       .index("userId", ["userId"])
       .index("programId", ["programId"])
-      .index("teacherId", ["teacherId"]),
+      .index("teacherId", ["teacherId"])
+      .index("stripeSessionId", ["stripeSessionId"]),
 
     // Access granted once an order is paid.
     enrollments: defineTable({

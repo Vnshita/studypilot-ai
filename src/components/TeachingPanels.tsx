@@ -282,7 +282,7 @@ function OrderLine({ orderId }: { orderId: string }) {
           {program ? program.title : "Program enrollment"}
         </p>
         <p className="text-xs text-muted-foreground">
-          Order · card ending {order.cardLast4}
+          Order · {order.cardLast4 ? `card ending ${order.cardLast4}` : "paid via Stripe"}
         </p>
       </div>
       <span className="text-sm font-semibold">

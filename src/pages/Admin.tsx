@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
 import { formatPriceCents, formatSessionTimeShort } from "@/lib/format";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import {
   BookMarked,
   BookOpen,
@@ -391,12 +391,16 @@ function ProgramsTab() {
 
 function OrdersTab() {
   const orders = useQuery(api.store.listRecent, {});
-  const refund = useMutation(api.store.refund);
+  const refund = useAction(api.payments.refundWithStripe);
 
   const handleRefund = async (orderId: string) => {
     try {
-      await refund({ orderId: orderId as never });
-      toast.success("Order refunded and access revoked.");
+      const result = await refund({ orderId: orderId as never });
+      toast.success(
+        result?.stripeRefunded
+          ? "Refunded through Stripe and access revoked."
+          : "Refunded in the ledger and access revoked.",
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not refund the order.",
@@ -455,7 +459,7 @@ function OrderRow({
           {program ? program.title : "Program enrollment"}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Card ending {order.cardLast4} ·{" "}
+          {order.cardLast4 ? `Card ending ${order.cardLast4}` : "Paid via Stripe"} ·{" "}
           {formatSessionTimeShort(order._creationTime)}
         </p>
       </div>
@@ -463,8 +467,14 @@ function OrderRow({
         <span className="text-sm font-semibold">
           {formatPriceCents(order.amountCents)}
         </span>
-        <Badge variant={order.status === "paid" ? "secondary" : "outline"}>
-          {order.status === "paid" ? "Paid" : "Refunded"}
+        <Badge
+          variant={order.status === "paid" ? "secondary" : "outline"}
+        >
+          {order.status === "paid"
+            ? "Paid"
+            : order.status === "pending"
+              ? "Pending"
+              : "Refunded"}
         </Badge>
         {order.status === "paid" && (
           <Button

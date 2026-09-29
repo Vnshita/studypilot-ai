@@ -200,7 +200,9 @@ export default function Dashboard() {
                           <div>
                             <OrderProgramName programId={order.programId} />
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                              Card ending {order.cardLast4}
+                              {order.cardLast4
+                                ? `Card ending ${order.cardLast4}`
+                                : "Paid via Stripe"}
                             </p>
                           </div>
                           <div className="text-right">

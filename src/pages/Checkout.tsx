@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
 import { formatPriceCents } from "@/lib/format";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { CreditCard, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -35,6 +35,7 @@ export default function Checkout() {
   );
 
   const checkout = useMutation(api.store.checkout);
+  const createSession = useAction(api.payments.createCheckoutSession);
 
   const [cardNumber, setCardNumber] = useState("");
   const [cardName, setCardName] = useState("");
@@ -48,14 +49,34 @@ export default function Checkout() {
 
     setIsProcessing(true);
     try {
-      await checkout({ programId: program._id, cardNumber });
-      toast.success("Payment received. Your place is confirmed.");
-      navigate(`/dashboard?enrolled=${program._id}`);
+      const { url } = await createSession({ programId: program._id, origin: window.location.origin });
+      // Hosted Stripe Checkout: the member pays on Stripe's secure page and is
+      // returned to /checkout/return, where the enrollment is granted.
+      window.location.assign(url);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "The payment could not be completed.",
-      );
-      setIsProcessing(false);
+      // Expected while STRIPE_SECRET_KEY is unset — fall back to the sandbox
+      // checkout so enrollment still works end to end.
+      if (error instanceof Error && error.message.includes("not configured")) {
+        try {
+          await checkout({ programId: program._id, cardNumber });
+          toast.success("Payment received (sandbox). Your place is confirmed.");
+          navigate(`/dashboard?enrolled=${program._id}`);
+        } catch (fallbackError) {
+          toast.error(
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : "The payment could not be completed.",
+          );
+          setIsProcessing(false);
+        }
+      } else {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "The payment could not be completed.",
+        );
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -179,8 +200,8 @@ export default function Checkout() {
                 Payment details
               </CardTitle>
               <CardDescription>
-                Charges are processed securely. This is a demonstration checkout —
-                no card is actually charged.
+                You'll pay securely on Stripe's hosted checkout page and return
+                here to start studying. Test mode: use card 4242 4242 4242 4242.
               </CardDescription>
             </CardHeader>
             <form onSubmit={handlePayment}>
