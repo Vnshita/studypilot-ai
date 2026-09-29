@@ -126,14 +126,23 @@ function MemberInit() {
 
 function RouteSyncer() {
   const location = useLocation();
+  // Only sync route changes while running inside the Vly preview iframe.
+  // On standalone hosts (Vercel, etc.) window.parent === window, so the
+  // postMessage and navigate listeners below are skipped entirely.
+  const inPreviewIframe =
+    typeof window !== "undefined" && window.parent !== window;
+
   useEffect(() => {
+    if (!inPreviewIframe) return;
     window.parent.postMessage(
       { type: "iframe-route-change", path: location.pathname },
       "*",
     );
-  }, [location.pathname]);
+  }, [inPreviewIframe, location.pathname]);
 
   useEffect(() => {
+    if (!inPreviewIframe) return;
+
     function handleMessage(event: MessageEvent) {
       if (event.data?.type === "navigate") {
         if (event.data.direction === "back") window.history.back();
@@ -142,7 +151,7 @@ function RouteSyncer() {
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [inPreviewIframe]);
 
   return null;
 }
