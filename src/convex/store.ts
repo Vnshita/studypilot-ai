@@ -118,18 +118,35 @@ export const refund = mutation({
   handler: async (ctx, args) => {
     await assertAdmin(ctx);
 
-    await ctx.db.patch(args.orderId, { status: "refunded" });
-
     const order = await ctx.db.get(args.orderId);
-    if (order) {
-      const enrollment = await ctx.db
-        .query("enrollments")
-        .withIndex("programId_userId", (q) =>
-          q.eq("programId", order.programId).eq("userId", order.userId),
-        )
-        .first();
-      if (enrollment) await ctx.db.delete(enrollment._id);
+    if (!order) throw new Error("That order no longer exists.");
+    if (order.status !== "paid") {
+      throw new Error("Only paid orders can be refunded.");
     }
+
+    // House policy: 50% back if requested within 3 days of enrollment, and
+    // nothing after. Stripe refunds (payments.refundWithStripe) return the
+    // same 50% to the card.
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    const withinWindow = Date.now() - order._creationTime <= THREE_DAYS_MS;
+    if (!withinWindow) {
+      throw new Error(
+        "The 3-day refund window for this enrollment has closed.",
+      );
+    }
+
+    await ctx.db.patch(args.orderId, {
+      status: "refunded",
+      refundAmountCents: Math.round(order.amountCents / 2),
+    });
+
+    const enrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("programId_userId", (q) =>
+        q.eq("programId", order.programId).eq("userId", order.userId),
+      )
+      .first();
+    if (enrollment) await ctx.db.delete(enrollment._id);
   },
 });
 

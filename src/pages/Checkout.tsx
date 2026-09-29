@@ -188,7 +188,7 @@ export default function Checkout() {
             </CardContent>
             <CardFooter className="text-xs leading-5 text-muted-foreground">
               Includes all sessions, marked submissions, and Society access for
-              the term. Cancel within the first week for a full refund.
+              the term. 50% refund if you cancel within 3 days.
             </CardFooter>
           </Card>
 
@@ -276,7 +276,7 @@ export default function Checkout() {
                 </Button>
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <ShieldCheck className="size-3.5" />
-                  Refundable within the first week of term.
+                  50% refund within the first 3 days of term.
                 </p>
               </CardFooter>
             </form>

@@ -213,7 +213,13 @@ export const checkSessionStatus = action({
 // Refunds
 // ---------------------------------------------------------------------------
 
-/** Admin: refund via Stripe when possible, fall back to ledger-only refunds. */
+/**
+ * Admin: refund via Stripe when possible, fall back to ledger-only refunds.
+ *
+ * House policy: 50% of the fee is returned if requested within 3 days of
+ * enrollment; nothing after. The 50% is refunded to the card through Stripe
+ * when the order was paid there, or recorded in the ledger otherwise.
+ */
 export const refundWithStripe = action({
   args: { orderId: v.id("orders") },
   handler: async (ctx, args) => {
@@ -230,11 +236,22 @@ export const refundWithStripe = action({
       throw new Error("Only paid orders can be refunded.");
     }
 
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    const withinWindow = Date.now() - order._creationTime <= THREE_DAYS_MS;
+    if (!withinWindow) {
+      throw new Error(
+        "The 3-day refund window for this enrollment has closed.",
+      );
+    }
+
+    const refundAmountCents = Math.round(order.amountCents / 2);
+
     let stripeRefunded = false;
     if (order.stripePaymentIntentId && process.env.STRIPE_SECRET_KEY) {
       try {
         await getStripe().refunds.create({
           payment_intent: order.stripePaymentIntentId,
+          amount: refundAmountCents,
         });
         stripeRefunded = true;
       } catch {
@@ -245,8 +262,8 @@ export const refundWithStripe = action({
 
     await ctx.runMutation(internal.paymentStore.completeRefund, {
       orderId: args.orderId,
-      stripeRefunded,
+      refundAmountCents,
     });
-    return { stripeRefunded };
+    return { stripeRefunded, refundAmountCents };
   },
 });

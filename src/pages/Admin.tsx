@@ -398,8 +398,8 @@ function OrdersTab() {
       const result = await refund({ orderId: orderId as never });
       toast.success(
         result?.stripeRefunded
-          ? "Refunded through Stripe and access revoked."
-          : "Refunded in the ledger and access revoked.",
+          ? "50% refunded to the card via Stripe; access revoked."
+          : "50% refund recorded in the ledger; access revoked.",
       );
     } catch (error) {
       toast.error(
@@ -413,7 +413,8 @@ function OrdersTab() {
       <CardHeader>
         <CardTitle>Recent enrollments</CardTitle>
         <CardDescription>
-          The twenty-five most recent orders across all programs.
+          The twenty-five most recent orders across all programs. Refunds
+          return 50% when requested within 3 days — nothing after.
         </CardDescription>
       </CardHeader>
       <CardContent>

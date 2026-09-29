@@ -13,6 +13,10 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  openStaxReaderUrl,
+  openStaxPdfPageUrl,
+} from "@/lib/openstax";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
@@ -261,6 +265,30 @@ function MaterialCard({
         </p>
       );
     }
+    if (material.kind === "textbook" && openStaxReaderUrl(material.fileUrl)) {
+      // OpenStax books open instantly in the in-app web reader; the 50–110 MB
+      // PDF is offered as a secondary download from the book's details page.
+      const pdfPage = openStaxPdfPageUrl(material.fileUrl);
+      return (
+        <div className="space-y-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2"
+            onClick={() => setOpen(true)}
+          >
+            <BookOpen className="size-3.5" />
+            Read the book
+          </Button>
+          <Button asChild variant="ghost" size="sm" className="w-full gap-2">
+            <a href={pdfPage ?? "https://openstax.org/subjects"} target="_blank" rel="noopener noreferrer">
+              <Download className="size-3.5" />
+              PDF download
+            </a>
+          </Button>
+        </div>
+      );
+    }
     if (material.kind === "textbook") {
       return (
         <Button asChild variant="outline" size="sm" className="w-full gap-2">
@@ -290,6 +318,12 @@ function MaterialCard({
   const playlistId =
     material.kind === "video" && material.fileUrl
       ? youTubePlaylistId(material.fileUrl)
+      : null;
+
+  // OpenStax textbooks read inside the app via their web reader.
+  const readerUrl =
+    material.kind === "textbook" && material.fileUrl
+      ? openStaxReaderUrl(material.fileUrl)
       : null;
 
   const handleRemove = async () => {
@@ -359,7 +393,7 @@ function MaterialCard({
         </div>
       </div>
 
-      {/* Notes reader / video player */}
+      {/* Book reader / notes reader / video player */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
@@ -367,11 +401,39 @@ function MaterialCard({
               {material.title}
             </DialogTitle>
             <DialogDescription>
-              {playlistId ? "Video series" : "Study notes"} · filed by{" "}
-              {material.contributorName}
+              {readerUrl
+                ? "OpenStax web reader"
+                : playlistId
+                  ? "Video series"
+                  : "Study notes"}{' '}· filed by {material.contributorName}
             </DialogDescription>
           </DialogHeader>
-          {playlistId && (
+          {readerUrl && (
+            <>
+              <div className="h-[65vh] w-full overflow-hidden rounded-md border border-border">
+                <iframe
+                  className="h-full w-full"
+                  src={readerUrl}
+                  title={material.title}
+                  loading="lazy"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Reading in the free OpenStax web reader. The downloadable PDF is
+                on the{' '}
+                <a
+                  className="text-primary underline-offset-4 hover:underline"
+                  href={openStaxPdfPageUrl(readerUrl) ?? "https://openstax.org/subjects"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  book's details page
+                </a>
+                .
+              </p>
+            </>
+          )}
+          {!readerUrl && playlistId && (
             <div className="aspect-video w-full overflow-hidden rounded-md border border-border">
               <iframe
                 className="h-full w-full"

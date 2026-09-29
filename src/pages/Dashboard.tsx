@@ -213,7 +213,11 @@ export default function Dashboard() {
                               variant={order.status === "paid" ? "secondary" : "outline"}
                               className="mt-0.5"
                             >
-                              {order.status === "paid" ? "Paid" : "Refunded"}
+                              {order.status === "paid"
+                                ? "Paid"
+                                : order.status === "pending"
+                                  ? "Pending"
+                                  : "Refunded"}
                             </Badge>
                           </div>
                         </li>

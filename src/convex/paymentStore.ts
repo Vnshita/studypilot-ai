@@ -135,12 +135,18 @@ export const settleOrder = internalMutation({
 });
 
 export const completeRefund = internalMutation({
-  args: { orderId: v.id("orders"), stripeRefunded: v.boolean() },
+  args: {
+    orderId: v.id("orders"),
+    refundAmountCents: v.number(),
+  },
   handler: async (ctx, args) => {
     const order = await ctx.db.get(args.orderId);
     if (!order) return;
 
-    await ctx.db.patch(args.orderId, { status: "refunded" });
+    await ctx.db.patch(args.orderId, {
+      status: "refunded",
+      refundAmountCents: args.refundAmountCents,
+    });
 
     const enrollment = await ctx.db
       .query("enrollments")

@@ -252,8 +252,7 @@ export default function ProgramDetail() {
                   </Button>
                 )}
                 <p className="text-center text-xs text-muted-foreground">
-                  One payment per term. Cancel within the first week for a full
-                  refund.
+                  One payment per term. 50% refund if you cancel within 3 days.
                 </p>
               </CardContent>
             </Card>

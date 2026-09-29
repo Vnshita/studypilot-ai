@@ -110,6 +110,9 @@ const schema = defineSchema(
       stripeSessionId: v.optional(v.string()),
       stripePaymentIntentId: v.optional(v.string()),
 
+      // Actual amount returned to the member (50% within the 3-day window).
+      refundAmountCents: v.optional(v.number()),
+
       // Teacher pay, stamped at checkout when a teacher is assigned.
       teacherId: v.optional(v.id("users")),
       teacherShareCents: v.optional(v.number()),

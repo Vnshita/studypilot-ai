@@ -182,51 +182,88 @@ export const ensureSeeded = mutation({
 });
 
 /**
- * Repairs rows seeded with earlier, now-dead OpenStax URLs. OpenStax moved
- * files to assets.openstax.org with slug-based names; the old cloudfront
- * bucket paths serve an AccessDenied XML that browsers cannot render.
- * Idempotent: only touches rows whose fileUrl matches a known-dead host.
+ * Repairs seeded rows whose links have rotted or degraded.
+ *
+ * Two generations of fixes:
+ *  1. Old dead hosts (cloudfront bucket, university mirror) → new OpenStax PDFs.
+ *  2. Direct WEB.pdf links (52–114 MB files that made browser tabs hang blank,
+ *     especially in the Android/iOS WebView) → the OpenStax web reader, which
+ *     opens instantly and works everywhere. PDFs remain available from each
+ *     book's details page, which the Library links beside the reader.
+ *
+ * Idempotent: only patches rows whose fileUrl differs from the target.
  */
 export const repairLinks = mutation({
   args: {},
   handler: async (ctx) => {
-    const deadHost = "d3bxy9euw4e147.cloudfront.net";
-    const deadMirror = "kfe.khmnu.edu.ua";
-
-    const replacements: Record<string, string> = {
-      "CalculusVolume1-OP.pdf":
-        "https://assets.openstax.org/oscms-prodcms/media/documents/calculus-volume-1_-_WEB.pdf",
-      "CalculusVolume2-OP.pdf":
-        "https://assets.openstax.org/oscms-prodcms/media/documents/calculus-volume-2_-_WEB.pdf",
-      "Precalculus-OP.pdf":
-        "https://assets.openstax.org/oscms-prodcms/media/documents/precalculus-2e_-_WEB.pdf",
-      "IntroductoryStatistics-OP.pdf":
-        "https://assets.openstax.org/oscms-prodcms/media/documents/introductory-statistics-2e_-_WEB.pdf",
-      "CollegePhysics-OP.pdf":
-        "https://assets.openstax.org/oscms-prodcms/media/documents/college-physics-2e_-_WEB.pdf",
-      "UniversityPhysicsVolume1-OP.pdf":
-        "https://assets.openstax.org/oscms-prodcms/media/documents/university-physics-volume-1_-_WEB.pdf",
-      "Chemistry2e-OP.pdf":
-        "https://assets.openstax.org/oscms-prodcms/media/documents/chemistry-2e_-_WEB.pdf",
-      "AnatomyAndPhysiology-OP.pdf":
-        "https://assets.openstax.org/oscms-prodcms/media/documents/anatomy-and-physiology-2e_-_WEB.pdf",
+    // Canonical, verified OpenStax web-reader links, keyed by seeded title.
+    const readerByTitle: Record<string, string> = {
+      "Calculus, Volume 1 (OpenStax)":
+        "https://openstax.org/books/calculus-volume-1/pages/1-introduction",
+      "Calculus, Volume 2 (OpenStax)":
+        "https://openstax.org/books/calculus-volume-2/pages/1-introduction",
+      "Precalculus (OpenStax)":
+        "https://openstax.org/books/precalculus-2e/pages/1-introduction-to-functions",
+      "Introductory Statistics (OpenStax)":
+        "https://openstax.org/books/introductory-statistics-2e/pages/1-introduction",
+      "College Physics 2e (OpenStax)":
+        "https://openstax.org/books/college-physics-2e/pages/1-introduction-to-science-and-the-realm-of-physics-physical-quantities-and-units",
+      "University Physics, Volume 1 (OpenStax)":
+        "https://openstax.org/books/university-physics-volume-1/pages/1-introduction",
+      "Chemistry 2e (OpenStax)":
+        "https://openstax.org/books/chemistry-2e/pages/1-introduction",
+      "Anatomy and Physiology (OpenStax)":
+        "https://openstax.org/books/anatomy-and-physiology-2e/pages/1-introduction",
+      "Principles of Economics 3e (OpenStax)":
+        "https://openstax.org/books/principles-economics-3e/pages/1-introduction",
     };
+
+    // First-generation repair table: dead hosts mapped by old filename.
+    const pdfByOldFilename: Record<string, string> = {
+      "CalculusVolume1-OP.pdf":
+        "https://openstax.org/books/calculus-volume-1/pages/1-introduction",
+      "CalculusVolume2-OP.pdf":
+        "https://openstax.org/books/calculus-volume-2/pages/1-introduction",
+      "Precalculus-OP.pdf":
+        "https://openstax.org/books/precalculus-2e/pages/1-introduction-to-functions",
+      "IntroductoryStatistics-OP.pdf":
+        "https://openstax.org/books/introductory-statistics-2e/pages/1-introduction",
+      "CollegePhysics-OP.pdf":
+        "https://openstax.org/books/college-physics-2e/pages/1-introduction-to-science-and-the-realm-of-physics-physical-quantities-and-units",
+      "UniversityPhysicsVolume1-OP.pdf":
+        "https://openstax.org/books/university-physics-volume-1/pages/1-introduction",
+      "Chemistry2e-OP.pdf":
+        "https://openstax.org/books/chemistry-2e/pages/1-introduction",
+      "AnatomyAndPhysiology-OP.pdf":
+        "https://openstax.org/books/anatomy-and-physiology-2e/pages/1-introduction",
+    };
+
+    const deadHosts = [
+      "d3bxy9euw4e147.cloudfront.net",
+      "kfe.khmnu.edu.ua",
+    ];
 
     const materials = await ctx.db.query("materials").collect();
     let repaired = 0;
     for (const material of materials) {
+      const reader = readerByTitle[material.title];
+      if (reader) {
+        if (material.fileUrl !== reader) {
+          await ctx.db.patch(material._id, { fileUrl: reader });
+          repaired++;
+        }
+        continue;
+      }
+
       if (!material.fileUrl) continue;
-      const isDead =
-        material.fileUrl.includes(deadHost) ||
-        material.fileUrl.includes(deadMirror);
+      const isDead = deadHosts.some((host) => material.fileUrl!.includes(host));
       if (!isDead) continue;
 
       const filename = material.fileUrl.split("/").pop() ?? "";
       const replacement =
-        replacements[filename] ??
-        // Economics has no direct PDF anymore; use the official book page.
+        pdfByOldFilename[filename] ??
         (material.title.includes("Economics")
-          ? "https://openstax.org/details/books/principles-of-economics-3e"
+          ? "https://openstax.org/books/principles-economics-3e/pages/1-introduction"
           : null);
       if (!replacement) continue;
 
@@ -266,8 +303,7 @@ const SEED: SeedMaterial[] = [
     title: "Calculus, Volume 1 (OpenStax)",
     description:
       "The standard first volume: limits, derivatives, and the integral, with worked examples throughout. Free and openly licensed.",
-    fileUrl:
-      "https://assets.openstax.org/oscms-prodcms/media/documents/calculus-volume-1_-_WEB.pdf",
+    fileUrl: "https://openstax.org/books/calculus-volume-1/pages/1-introduction",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -277,8 +313,7 @@ const SEED: SeedMaterial[] = [
     title: "Calculus, Volume 2 (OpenStax)",
     description:
       "Integration techniques, sequences and series, parametric and polar curves — the continuation of Volume 1.",
-    fileUrl:
-      "https://assets.openstax.org/oscms-prodcms/media/documents/calculus-volume-2_-_WEB.pdf",
+    fileUrl: "https://openstax.org/books/calculus-volume-2/pages/1-introduction",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -288,8 +323,7 @@ const SEED: SeedMaterial[] = [
     title: "Precalculus (OpenStax)",
     description:
       "Algebra, trigonometry, and the functions family — the groundwork every program here assumes you can lean on.",
-    fileUrl:
-      "https://assets.openstax.org/oscms-prodcms/media/documents/precalculus-2e_-_WEB.pdf",
+    fileUrl: "https://openstax.org/books/precalculus-2e/pages/1-introduction-to-functions",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -299,8 +333,7 @@ const SEED: SeedMaterial[] = [
     title: "Introductory Statistics (OpenStax)",
     description:
       "From descriptive statistics through inference, with real datasets. Companion to the Statistical Judgment program.",
-    fileUrl:
-      "https://assets.openstax.org/oscms-prodcms/media/documents/introductory-statistics-2e_-_WEB.pdf",
+    fileUrl: "https://openstax.org/books/introductory-statistics-2e/pages/1-introduction",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -330,8 +363,7 @@ const SEED: SeedMaterial[] = [
     title: "College Physics 2e (OpenStax)",
     description:
       "Algebra-based physics from mechanics through modern physics, written for students meeting the subject seriously for the first time.",
-    fileUrl:
-      "https://assets.openstax.org/oscms-prodcms/media/documents/college-physics-2e_-_WEB.pdf",
+    fileUrl: "https://openstax.org/books/college-physics-2e/pages/1-introduction-to-science-and-the-realm-of-physics-physical-quantities-and-units",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -341,8 +373,7 @@ const SEED: SeedMaterial[] = [
     title: "University Physics, Volume 1 (OpenStax)",
     description:
       "Calculus-based mechanics, waves, and thermodynamics — the deeper treatment for members in the physics programs.",
-    fileUrl:
-      "https://assets.openstax.org/oscms-prodcms/media/documents/university-physics-volume-1_-_WEB.pdf",
+    fileUrl: "https://openstax.org/books/university-physics-volume-1/pages/1-introduction",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -363,8 +394,7 @@ const SEED: SeedMaterial[] = [
     title: "Chemistry 2e (OpenStax)",
     description:
       "General chemistry: structure, bonding, thermodynamics, and kinetics, with strong problem sets. Foundation for Organic Reaction Logic.",
-    fileUrl:
-      "https://assets.openstax.org/oscms-prodcms/media/documents/chemistry-2e_-_WEB.pdf",
+    fileUrl: "https://openstax.org/books/chemistry-2e/pages/1-introduction",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -435,8 +465,8 @@ const SEED: SeedMaterial[] = [
     kind: "textbook",
     title: "Principles of Economics 3e (OpenStax)",
     description:
-      "Micro and macro in one volume: supply, elasticity, market structures, and the macro aggregates, with current examples. Open the page and choose “Download a PDF”.",
-    fileUrl: "https://openstax.org/details/books/principles-of-economics-3e",
+      "Micro and macro in one volume: supply, elasticity, market structures, and the macro aggregates, with current examples. Opens instantly in the free web reader; the PDF lives on the book's details page.",
+    fileUrl: "https://openstax.org/books/principles-economics-3e/pages/1-introduction",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -468,8 +498,7 @@ const SEED: SeedMaterial[] = [
     title: "Anatomy and Physiology (OpenStax)",
     description:
       "Systems-based A&P from cells to organ systems, with clinical notes. Reliable reference for pre-medical members.",
-    fileUrl:
-      "https://assets.openstax.org/oscms-prodcms/media/documents/anatomy-and-physiology-2e_-_WEB.pdf",
+    fileUrl: "https://openstax.org/books/anatomy-and-physiology-2e/pages/1-introduction",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
