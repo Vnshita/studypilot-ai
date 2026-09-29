@@ -127,6 +127,9 @@
   }
   body {
     @apply bg-background font-sans text-foreground antialiased;
+    /* Notched and rounded displays: keep content clear of the insets. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   button:not([disabled]),
   [role="button"]:not([disabled]) {
@@ -147,5 +150,12 @@
     background-image:
       radial-gradient(60rem 30rem at 85% -10%, oklch(0.929 0.022 84 / 55%), transparent 60%),
       radial-gradient(50rem 26rem at 0% 0%, oklch(0.949 0.014 78 / 40%), transparent 55%);
+  }
+  /* Safe-area helpers for standalone (installed) use on phones. */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }

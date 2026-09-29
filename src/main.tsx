@@ -1,6 +1,7 @@
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { InstallBanner } from "@/components/InstallBanner";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useMutation } from "convex/react";
@@ -202,7 +203,18 @@ createRoot(document.getElementById("root")!).render(
           </Suspense>
         </BrowserRouter>
         <Toaster />
+        <InstallBanner />
       </ConvexAuthProvider>
     </RootErrorBoundary>
   </StrictMode>,
 );
+
+// Android/Chrome: enable the install prompt and offline shell in production.
+// iOS installs via Safari's "Add to Home Screen" (no prompt event exists).
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((error) => {
+      console.warn("[PWA] Service worker registration failed:", error);
+    });
+  });
+}
