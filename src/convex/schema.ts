@@ -37,8 +37,11 @@ export const memberStanding = v.union(
 );
 
 export const materialKind = v.union(
-  v.literal("textbook"),
-  v.literal("notes"),
+  v.literal("textbook"), // free PDF, opens in a new window
+  v.literal("notes"), // house-written notes, read in place
+  v.literal("video"), // free video course or lecture series
+  v.literal("tutorial"), // free interactive tutorial or practice site
+  v.literal("course"), // paid course on an external platform
 );
 
 const schema = defineSchema(
@@ -137,13 +140,17 @@ const schema = defineSchema(
       body: v.string(),
     }).index("conversationId", ["conversationId"]),
 
-    // The library: textbooks and study material, organized by discipline.
+    // The library: textbooks, notes, videos, tutorials, and paid courses,
+    // organized by discipline.
     materials: defineTable({
       discipline: v.string(),
       kind: materialKind,
       title: v.string(),
       description: v.string(),
       fileUrl: v.optional(v.string()),
+      // For paid courses: what it costs and where it lives, e.g.
+      // "Included with Coursera Plus" or "$59 one-time purchase".
+      pricingNote: v.optional(v.string()),
       contributorId: v.id("users"),
       contributorName: v.string(),
       status: programStatus, // published / draft — same lifecycle as programs

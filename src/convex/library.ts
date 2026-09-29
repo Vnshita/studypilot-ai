@@ -52,10 +52,17 @@ export const listDisciplines = query({
 
 const materialValidator = {
   discipline: v.string(),
-  kind: v.union(v.literal("textbook"), v.literal("notes")),
+  kind: v.union(
+    v.literal("textbook"),
+    v.literal("notes"),
+    v.literal("video"),
+    v.literal("tutorial"),
+    v.literal("course"),
+  ),
   title: v.string(),
   description: v.string(),
   fileUrl: v.optional(v.string()),
+  pricingNote: v.optional(v.string()),
 };
 
 export const create = mutation({
@@ -81,11 +88,17 @@ export const create = mutation({
       throw new Error("The link must start with http:// or https://");
     }
 
+    // Paid courses must always say where the money goes.
+    if (args.kind === "course" && !args.pricingNote?.trim()) {
+      throw new Error("Paid courses need a short pricing note.");
+    }
+
     return await ctx.db.insert("materials", {
       ...args,
       title,
       description,
       fileUrl: args.fileUrl?.trim() || undefined,
+      pricingNote: args.pricingNote?.trim() || undefined,
       contributorId: userId,
       contributorName: user.name || user.email || "A member of the house",
       status: "published",
@@ -134,14 +147,15 @@ export const adminRemove = mutation({
 // ---------------------------------------------------------------------------
 
 /**
- * Public and idempotent: fills the library once when the table is empty.
- * Safe to call from the client on app start.
+ * Public and idempotent: adds any library entry that is not yet present
+ * (matched by title). Safe to call on every app start; this is how new
+ * material reaches deployments that were seeded earlier.
  */
 export const ensureSeeded = mutation({
   args: {},
   handler: async (ctx) => {
-    const existing = await ctx.db.query("materials").first();
-    if (existing) return;
+    const existing = await ctx.db.query("materials").collect();
+    const knownTitles = new Set(existing.map((m) => m.title));
 
     // The house collection is attributed to the administrator; until the
     // first member joins there is nobody to attribute it to, so we wait.
@@ -152,13 +166,18 @@ export const ensureSeeded = mutation({
         .first()) ?? (await ctx.db.query("users").first());
     if (!admin) return;
 
+    let added = 0;
     for (const { contributorId: _placeholder, ...item } of SEED) {
+      if (knownTitles.has(item.title)) continue;
       await ctx.db.insert("materials", {
         ...item,
         contributorId: admin._id,
         status: "published",
       });
+      added++;
     }
+
+    return { added };
   },
 });
 
@@ -169,10 +188,11 @@ export const ensureSeeded = mutation({
 
 type SeedMaterial = {
   discipline: string;
-  kind: "textbook" | "notes";
+  kind: "textbook" | "notes" | "video" | "tutorial" | "course";
   title: string;
   description: string;
   fileUrl?: string;
+  pricingNote?: string;
   contributorId: string;
   contributorName: string;
 };
@@ -394,6 +414,187 @@ const SEED: SeedMaterial[] = [
       "Systems-based A&P from cells to organ systems, with clinical notes. Reliable reference for pre-medical members.",
     fileUrl:
       "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/AnatomyAndPhysiology-OP.pdf",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+
+  // ---------------------------------------------------------------------------
+  // Free video courses and lecture series — real links, verified at build time.
+  // ---------------------------------------------------------------------------
+
+  {
+    discipline: "Mathematics",
+    kind: "video",
+    title: "Essence of Linear Algebra (3Blue1Brown)",
+    description:
+      "Grant Sanderson's animated series builds the geometric intuition behind vectors, matrices, and determinants. The complement to any algebra course.",
+    fileUrl: "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Mathematics",
+    kind: "video",
+    title: "Essence of Calculus (3Blue1Brown)",
+    description:
+      "Calculus re-imagined visually: what a derivative really is, why the chain rule looks the way it does, and what integrals have to do with circles.",
+    fileUrl: "https://www.youtube.com/playlist?list=PLZHQObOWTQDMsr9K-rj53DwVRMYO3t5Yr",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Mathematics",
+    kind: "video",
+    title: "MIT 18.06 Linear Algebra — Full Lectures (Gilbert Strang)",
+    description:
+      "The legendary MIT lecture course, free and complete. Strang teaches the subject the way it is actually used. Lecture notes and problem sets included.",
+    fileUrl: "https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Physics",
+    kind: "video",
+    title: "MIT 8.01 Classical Mechanics — Full Course",
+    description:
+      "Walter Lewin's legendary lectures and the full modern MITx course materials: problem sets, exams, and worked solutions, all free.",
+    fileUrl: "https://ocw.mit.edu/courses/8-01sc-classical-mechanics-fall-2016/",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+
+  {
+    discipline: "Computer Science",
+    kind: "video",
+    title: "CS50: Introduction to Computer Science (Harvard)",
+    description:
+      "David Malan's famous entry course, free for anyone: lectures, labs, and problem sets in C, Python, SQL, and JavaScript. The best first course in computing ever filmed.",
+    fileUrl: "https://cs50.harvard.edu/x/",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+
+  // ---------------------------------------------------------------------------
+  // Free interactive tutorials and practice sites.
+  // ---------------------------------------------------------------------------
+
+  {
+    discipline: "Mathematics",
+    kind: "tutorial",
+    title: "Khan Academy — Mathematics",
+    description:
+      "From counting to multivariable calculus, with practice exercises, instant feedback, and mastery tracking. Free forever, no account needed to practice.",
+    fileUrl: "https://www.khanacademy.org/math",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Physics",
+    kind: "tutorial",
+    title: "Khan Academy — Physics",
+    description:
+      "Short lessons and practice on every topic from one-dimensional motion to thermodynamics. Ideal warm-up before the house's physics programs.",
+    fileUrl: "https://www.khanacademy.org/science/physics",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Chemistry",
+    kind: "tutorial",
+    title: "Khan Academy — Chemistry",
+    description:
+      "Stoichiometry, bonding, acids and bases, and organic basics with worked examples and practice sets.",
+    fileUrl: "https://www.khanacademy.org/science/chemistry",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Economics",
+    kind: "tutorial",
+    title: "Marginal Revolution University",
+    description:
+      "Free video library from economists Tyler Cowen and Alex Tabarrok: micro, macro, and everyday economics, taught with clarity and wit.",
+    fileUrl: "https://mru.org/",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Writing",
+    kind: "tutorial",
+    title: "Khan Academy — Grammar & Writing",
+    description:
+      "Interactive grammar practice with immediate feedback — the quiet hours of editing made less mysterious.",
+    fileUrl: "https://www.khanacademy.org/humanities/grammar",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Computer Science",
+    kind: "tutorial",
+    title: "MIT 6.0001 — Introduction to CS & Programming in Python",
+    description:
+      "Full MIT course materials: lectures, slides, problem sets, and exams. The rigorous companion to Python from Zero.",
+    fileUrl: "https://ocw.mit.edu/courses/6-0001-introduction-to-computer-science-and-programming-in-python-fall-2016/",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+
+  // ---------------------------------------------------------------------------
+  // Paid courses on external platforms — the link goes to the vendor.
+  // ---------------------------------------------------------------------------
+
+  {
+    discipline: "Mathematics",
+    kind: "course",
+    title: "Brilliant.org — Logic & Mathematics Foundations",
+    description:
+      "Interactive problem-solving with immediate feedback. Superb for building intuition between the house's sessions; the free tier is limited, the subscription is worth it.",
+    fileUrl: "https://brilliant.org/",
+    pricingNote: "Subscription (free tier available)",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Computer Science",
+    kind: "course",
+    title: "CS50 Professional Certificate (edX)",
+    description:
+      "The verified, graded version of Harvard's CS50 with a certificate on completion. The free path covers everything; this adds grading and credentials.",
+    fileUrl: "https://cs50.harvard.edu/x/",
+    pricingNote: "From $209 (certificate track)",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Business",
+    kind: "course",
+    title: "Google Project Management Certificate (Coursera)",
+    description:
+      "Practical, employer-recognized training in planning, agile, and stakeholder communication. Pairs well with The Interview Studio.",
+    fileUrl: "https://www.coursera.org/professional-certificates/google-project-management",
+    pricingNote: "Coursera subscription",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Health",
+    kind: "course",
+    title: "The Science of Well-Being (Coursera, Yale)",
+    description:
+      "Laurie Santos's celebrated course on the psychology of happiness — the evidence behind habits, with structured assignments. Audit free; certificate paid.",
+    fileUrl: "https://www.coursera.org/learn/the-science-of-well-being",
+    pricingNote: "Audit free · certificate paid",
+    contributorId: HOUSE,
+    contributorName: "The House Library",
+  },
+  {
+    discipline: "Languages",
+    kind: "course",
+    title: "italki — Private Language Tutors",
+    description:
+      "One-on-one video lessons with native speakers at every price point. The speaking practice that turns Everyday French into fluency.",
+    fileUrl: "https://www.italki.com/",
+    pricingNote: "From ~$10 per lesson",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },

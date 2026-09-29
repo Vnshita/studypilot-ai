@@ -21,10 +21,13 @@ import { useMutation, useQuery } from "convex/react";
 import {
   BookMarked,
   BookOpen,
+  CircleDollarSign,
   Download,
+  ExternalLink,
   FileText,
   Loader2,
   NotebookPen,
+  Play,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -128,6 +131,7 @@ export default function Library() {
                     title: material.title,
                     description: material.description,
                     fileUrl: material.fileUrl ?? null,
+                    pricingNote: material.pricingNote ?? null,
                     contributorName: material.contributorName,
                   }}
                   canManage={user?._id === material.contributorId}
@@ -190,12 +194,21 @@ export default function Library() {
 
 interface MaterialCardData {
   _id: string;
-  kind: "textbook" | "notes";
+  kind: "textbook" | "notes" | "video" | "tutorial" | "course";
   title: string;
   description: string;
   fileUrl: string | null;
+  pricingNote?: string | null;
   contributorName: string;
 }
+
+const KIND_LABEL: Record<MaterialCardData["kind"], string> = {
+  textbook: "Textbook",
+  notes: "Notes",
+  video: "Video",
+  tutorial: "Tutorial",
+  course: "Paid course",
+};
 
 function MaterialCard({
   material,
@@ -208,8 +221,65 @@ function MaterialCard({
   const [open, setOpen] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
 
-  const isTextbook = material.kind === "textbook";
-  const Icon = isTextbook ? BookOpen : NotebookPen;
+  const isNotes = material.kind === "notes";
+  const isPaid = material.kind === "course";
+  const Icon =
+    material.kind === "textbook"
+      ? BookOpen
+      : material.kind === "video"
+        ? Play
+        : material.kind === "tutorial"
+          ? ExternalLink
+          : isPaid
+            ? CircleDollarSign
+            : NotebookPen;
+
+  const action = (() => {
+    if (isNotes) {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-2"
+          onClick={() => setOpen(true)}
+        >
+          <FileText className="size-3.5" />
+          Read the notes
+        </Button>
+      );
+    }
+    if (!material.fileUrl) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          The link to this item is being restored.
+        </p>
+      );
+    }
+    if (material.kind === "textbook") {
+      return (
+        <Button asChild variant="outline" size="sm" className="w-full gap-2">
+          <a href={material.fileUrl} target="_blank" rel="noopener noreferrer">
+            <Download className="size-3.5" />
+            Open the PDF
+          </a>
+        </Button>
+      );
+    }
+    const cta =
+      material.kind === "video"
+        ? "Watch the series"
+        : material.kind === "tutorial"
+          ? "Open the tutorial"
+          : "View the course";
+    return (
+      <Button asChild variant="outline" size="sm" className="w-full gap-2">
+        <a href={material.fileUrl} target="_blank" rel="noopener noreferrer">
+          <ExternalLink className="size-3.5" />
+          {cta}
+        </a>
+      </Button>
+    );
+  })();
 
   const handleRemove = async () => {
     setIsRemoving(true);
@@ -231,7 +301,7 @@ function MaterialCard({
         <div className="flex items-center justify-between">
           <Badge variant="secondary" className="gap-1.5 font-medium">
             <Icon className="size-3" />
-            {isTextbook ? "Textbook" : "Notes"}
+            {KIND_LABEL[material.kind]}
           </Badge>
           {canManage && (
             <Button
@@ -250,6 +320,11 @@ function MaterialCard({
         <h3 className="display mt-4 text-lg font-semibold leading-snug">
           {material.title}
         </h3>
+        {isPaid && material.pricingNote && (
+          <p className="mt-1.5 text-xs font-medium text-primary">
+            Paid · {material.pricingNote}
+          </p>
+        )}
         <p className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-muted-foreground">
           {material.description}
         </p>
@@ -258,32 +333,7 @@ function MaterialCard({
           Filed by {material.contributorName}
         </p>
 
-        <div className="mt-3">
-          {isTextbook ? (
-            material.fileUrl ? (
-              <Button asChild variant="outline" size="sm" className="w-full gap-2">
-                <a href={material.fileUrl} target="_blank" rel="noopener noreferrer">
-                  <Download className="size-3.5" />
-                  Open the PDF
-                </a>
-              </Button>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                The link to this text is being restored.
-              </p>
-            )
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-2"
-              onClick={() => setOpen(true)}
-            >
-              <FileText className="size-3.5" />
-              Read the notes
-            </Button>
-          )}
-        </div>
+        <div className="mt-3">{action}</div>
       </div>
 
       {/* Notes reader */}

@@ -32,6 +32,7 @@ import {
   ArrowUpRight,
   BookOpen,
   CalendarClock,
+  CircleDollarSign,
   CreditCard,
   GraduationCap,
   Layers,
@@ -416,7 +417,7 @@ function StandingCard({
 interface StudioMaterial {
   _id: string;
   discipline: string;
-  kind: "textbook" | "notes";
+  kind: "textbook" | "notes" | "video" | "tutorial" | "course";
   title: string;
 }
 
@@ -435,10 +436,11 @@ function TeachingStudio({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     discipline: "",
-    kind: "textbook" as "textbook" | "notes",
+    kind: "textbook" as "textbook" | "notes" | "video" | "tutorial" | "course",
     title: "",
     description: "",
     fileUrl: "",
+    pricingNote: "",
   });
 
   const shelfOptions = disciplines ?? [];
@@ -453,6 +455,7 @@ function TeachingStudio({
         title: form.title,
         description: form.description,
         fileUrl: form.fileUrl.trim() || undefined,
+        pricingNote: form.pricingNote.trim() || undefined,
       });
       toast.success("Filed to the Library shelf.");
       setForm({
@@ -461,6 +464,7 @@ function TeachingStudio({
         title: "",
         description: "",
         fileUrl: "",
+        pricingNote: "",
       });
       setOpen(false);
     } catch (error) {
@@ -520,15 +524,21 @@ function TeachingStudio({
                     <Select
                       value={form.kind}
                       onValueChange={(v) =>
-                        setForm((f) => ({ ...f, kind: v as "textbook" | "notes" }))
+                        setForm((f) => ({
+                          ...f,
+                          kind: v as typeof form.kind,
+                        }))
                       }
                     >
                       <SelectTrigger id="m-kind" className="w-full">
                         <SelectValue placeholder="Choose a type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="textbook">Textbook (PDF)</SelectItem>
+                        <SelectItem value="textbook">Textbook (free PDF)</SelectItem>
                         <SelectItem value="notes">Study notes</SelectItem>
+                        <SelectItem value="video">Video course (free)</SelectItem>
+                        <SelectItem value="tutorial">Tutorial (free)</SelectItem>
+                        <SelectItem value="course">Paid course (external)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -577,9 +587,12 @@ function TeachingStudio({
                     required
                   />
                 </div>
-                {form.kind === "textbook" && (
+                {(form.kind === "textbook" ||
+                  form.kind === "video" ||
+                  form.kind === "tutorial" ||
+                  form.kind === "course") && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="m-url">PDF link (https://…)</Label>
+                    <Label htmlFor="m-url">Link (https://…)</Label>
                     <Input
                       id="m-url"
                       type="url"
@@ -587,7 +600,25 @@ function TeachingStudio({
                       onChange={(e) =>
                         setForm((f) => ({ ...f, fileUrl: e.target.value }))
                       }
-                      placeholder="https://example.com/textbook.pdf"
+                      placeholder={
+                        form.kind === "course"
+                          ? "https://www.coursera.org/learn/…"
+                          : "https://example.com/resource"
+                      }
+                    />
+                  </div>
+                )}
+                {form.kind === "course" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="m-pricing">Pricing note (shown on the card)</Label>
+                    <Input
+                      id="m-pricing"
+                      value={form.pricingNote}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, pricingNote: e.target.value }))
+                      }
+                      placeholder="e.g. Subscription · free tier available"
+                      required
                     />
                   </div>
                 )}
@@ -617,6 +648,8 @@ function TeachingStudio({
                   <div className="flex min-w-0 items-center gap-3">
                     {material.kind === "textbook" ? (
                       <BookOpen className="size-4 shrink-0 text-primary" />
+                    ) : material.kind === "course" ? (
+                      <CircleDollarSign className="size-4 shrink-0 text-primary" />
                     ) : (
                       <Presentation className="size-4 shrink-0 text-primary" />
                     )}
@@ -624,7 +657,15 @@ function TeachingStudio({
                       <p className="truncate text-sm font-medium">{material.title}</p>
                       <p className="text-xs text-muted-foreground">
                         {material.discipline} ·{" "}
-                        {material.kind === "textbook" ? "Textbook" : "Notes"}
+                        {material.kind === "textbook"
+                          ? "Textbook"
+                          : material.kind === "video"
+                            ? "Video"
+                            : material.kind === "tutorial"
+                              ? "Tutorial"
+                              : material.kind === "course"
+                                ? "Paid course"
+                                : "Notes"}
                       </p>
                     </div>
                   </div>
