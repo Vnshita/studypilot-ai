@@ -13,10 +13,6 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  openStaxReaderUrl,
-  openStaxPdfPageUrl,
-} from "@/lib/openstax";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
@@ -210,6 +206,27 @@ interface MaterialCardData {
 function youTubePlaylistId(url: string): string | null {
   const match = url.match(/[?&]list=([A-Za-z0-9_-]+)/);
   return match ? match[1] : null;
+}
+
+const OPENSTAX_READER_PATTERN =
+  /^https:\/\/openstax\.org\/books\/([^/]+)\/pages\/(.+)$/;
+
+/**
+ * True when a material URL is an OpenStax web-reader page. OpenStax books read
+ * best there — instant, mobile-friendly, embeddable. Their direct PDFs are
+ * 50–110 MB files that leave tabs (and the Android/iOS WebView) blank, so the
+ * PDF is offered as a secondary download from the book's details page.
+ */
+function openStaxReaderUrl(url: string): string | null {
+  return OPENSTAX_READER_PATTERN.test(url) ? url : null;
+}
+
+/** Canonical details page for an OpenStax book (the PDF download lives there). */
+function openStaxPdfPageUrl(readerUrl: string): string | null {
+  const match = readerUrl.match(OPENSTAX_READER_PATTERN);
+  return match
+    ? `https://openstax.org/details/books/${match[1]}`
+    : null;
 }
 
 const KIND_LABEL: Record<MaterialCardData["kind"], string> = {
