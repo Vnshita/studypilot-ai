@@ -45,7 +45,7 @@ import {
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { TeachingPanels } from "@/components/TeachingPanels";
+import { MeetingLink, TeachingPanels } from "@/components/TeachingPanels";
 
 export default function Dashboard() {
   const { user } = useAuth();
