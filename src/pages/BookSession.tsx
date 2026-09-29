@@ -1,5 +1,6 @@
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { MeetingLink } from "@/components/TeachingPanels";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -232,12 +233,15 @@ export default function BookSession() {
                         key={booking._id}
                         className="flex items-start justify-between gap-3 border-b border-border/60 pb-3 last:border-0 last:pb-0"
                       >
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-sm font-medium">{booking.topic}</p>
                           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                             <CheckCircle2 className="size-3.5 text-primary" />
                             {booking.tutorName} · {formatSessionTime(booking.startsAt)}
                           </p>
+                          {booking.meetingUrl ? (
+                            <MeetingLink url={booking.meetingUrl} startsAt={booking.startsAt} />
+                          ) : null}
                         </div>
                         <Button
                           variant="ghost"

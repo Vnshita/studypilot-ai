@@ -69,6 +69,15 @@ export const checkout = mutation({
       amountCents: program.priceCents,
       status: "paid",
       cardLast4: digits.slice(-4),
+
+      // Stamp teacher pay at purchase time (70% default, per-program override).
+      teacherId: program.teacherId,
+      teacherShareCents: program.teacherId
+        ? Math.round(
+            (program.priceCents * (program.teacherShareBps ?? 7000)) / 10000,
+          )
+        : undefined,
+      payoutStatus: program.teacherId ? "due" : undefined,
     });
 
     await ctx.db.insert("enrollments", { userId, programId: args.programId });

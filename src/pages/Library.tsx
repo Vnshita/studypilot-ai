@@ -202,6 +202,12 @@ interface MaterialCardData {
   contributorName: string;
 }
 
+/** Extract a YouTube playlist ID from a URL, if the link is one. */
+function youTubePlaylistId(url: string): string | null {
+  const match = url.match(/[?&]list=([A-Za-z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
 const KIND_LABEL: Record<MaterialCardData["kind"], string> = {
   textbook: "Textbook",
   notes: "Notes",
@@ -281,6 +287,11 @@ function MaterialCard({
     );
   })();
 
+  const playlistId =
+    material.kind === "video" && material.fileUrl
+      ? youTubePlaylistId(material.fileUrl)
+      : null;
+
   const handleRemove = async () => {
     setIsRemoving(true);
     try {
@@ -333,20 +344,45 @@ function MaterialCard({
           Filed by {material.contributorName}
         </p>
 
-        <div className="mt-3">{action}</div>
+        <div className="mt-3 space-y-2">
+          {action}
+          {playlistId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => setOpen(true)}
+            >
+              Preview here
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Notes reader */}
+      {/* Notes reader / video player */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="display pr-6 text-xl leading-snug">
               {material.title}
             </DialogTitle>
             <DialogDescription>
-              Study notes · filed by {material.contributorName}
+              {playlistId ? "Video series" : "Study notes"} · filed by{" "}
+              {material.contributorName}
             </DialogDescription>
           </DialogHeader>
+          {playlistId && (
+            <div className="aspect-video w-full overflow-hidden rounded-md border border-border">
+              <iframe
+                className="h-full w-full"
+                src={`https://www.youtube-nocookie.com/embed/videoseries?list=${playlistId}`}
+                title={material.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+              />
+            </div>
+          )}
           <p className="whitespace-pre-line text-sm leading-7 text-muted-foreground">
             {material.description}
           </p>

@@ -65,6 +65,8 @@ export const book = mutation({
       topic,
       startsAt: args.startsAt,
       status: "upcoming",
+      // A private video room for the session (free Jitsi Meet, no account).
+      meetingUrl: `https://meet.jit.si/alcove-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     });
   },
 });

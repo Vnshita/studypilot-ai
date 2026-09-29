@@ -29,6 +29,7 @@ import {
   BookMarked,
   BookOpen,
   GraduationCap,
+  HandCoins,
   Loader2,
   Plus,
   Users,
@@ -112,6 +113,10 @@ export default function Admin() {
               <BookMarked className="size-3.5" />
               Library
             </TabsTrigger>
+            <TabsTrigger value="payouts" className="gap-1.5">
+              <HandCoins className="size-3.5" />
+              Payouts
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="programs" className="mt-6">
@@ -125,6 +130,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="library" className="mt-6">
             <LibraryAdminTab />
+          </TabsContent>
+          <TabsContent value="payouts" className="mt-6">
+            <PayoutsTab />
           </TabsContent>
         </Tabs>
       </main>
@@ -627,5 +635,109 @@ function MembersTab() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Teacher payouts
+// ---------------------------------------------------------------------------
+
+function PayoutsTab() {
+  const duePayouts = useQuery(api.teaching.listDuePayouts, {});
+  const markSent = useMutation(api.teaching.markPayoutSent);
+
+  const total = (duePayouts ?? []).reduce(
+    (sum, o) => sum + (o.teacherShareCents ?? 0),
+    0,
+  );
+
+  const handleMarkSent = async (orderId: string) => {
+    try {
+      await markSent({ orderId: orderId as never });
+      toast.success("Payout marked as sent.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not mark the payout.",
+      );
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Teacher payouts</CardTitle>
+        <CardDescription>
+          Every enrollment owes its teacher 70% of the fee. Settle each line
+          once you have sent the money — the teacher sees it the moment you do.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {duePayouts === undefined ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : duePayouts.length === 0 ? (
+          <p className="py-6 text-sm text-muted-foreground">
+            No payouts are due. Every teacher has been settled.
+          </p>
+        ) : (
+          <>
+            <div className="mb-4 flex items-center justify-between rounded-md border border-primary/25 bg-secondary/50 px-4 py-3">
+              <p className="eyebrow text-muted-foreground">Owed to teachers</p>
+              <p className="display text-lg font-semibold">
+                {formatPriceCents(total)}
+              </p>
+            </div>
+            <ul className="divide-y divide-border/70">
+              {duePayouts.map((order) => (
+                <PayoutRow
+                  key={order._id}
+                  orderId={order._id}
+                  onMarkSent={handleMarkSent}
+                />
+              ))}
+            </ul>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PayoutRow({
+  orderId,
+  onMarkSent,
+}: {
+  orderId: string;
+  onMarkSent: (orderId: string) => void;
+}) {
+  const order = useQuery(api.store.getOrder, { id: orderId as never });
+  const program = useQuery(
+    api.programs.getById,
+    order ? { id: order.programId as never } : "skip",
+  );
+
+  if (!order) return null;
+
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-3 py-4">
+      <div className="min-w-0">
+        <p className="font-medium">
+          {program ? program.title : "Program enrollment"}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Enrollment of {formatPriceCents(order.amountCents)} ·{" "}
+          {formatSessionTimeShort(order._creationTime)}
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-semibold">
+          {formatPriceCents(order.teacherShareCents ?? 0)}
+        </span>
+        <Button size="sm" variant="outline" onClick={() => onMarkSent(order._id)}>
+          Mark paid
+        </Button>
+      </div>
+    </li>
   );
 }

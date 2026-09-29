@@ -31,6 +31,11 @@ export const bookingStatus = v.union(
   v.literal("cancelled"),
 );
 
+export const payoutStatus = v.union(
+  v.literal("due"),
+  v.literal("paid"),
+);
+
 export const memberStanding = v.union(
   v.literal("student"),
   v.literal("teacher"),
@@ -81,6 +86,12 @@ const schema = defineSchema(
       durationMinutes: v.number(),
       tags: v.array(v.string()),
       status: programStatus,
+
+      // Teaching assignment and pay split. teacherShareBps is basis points
+      // of the program price paid to the assigned teacher (default 70%).
+      teacherId: v.optional(v.id("users")),
+      pendingTeacherId: v.optional(v.id("users")), // application awaiting approval
+      teacherShareBps: v.optional(v.number()),
     })
       .index("discipline", ["discipline"])
       .index("status", ["status"]),
@@ -92,9 +103,15 @@ const schema = defineSchema(
       amountCents: v.number(),
       status: orderStatus,
       cardLast4: v.string(),
+
+      // Teacher pay, stamped at checkout when a teacher is assigned.
+      teacherId: v.optional(v.id("users")),
+      teacherShareCents: v.optional(v.number()),
+      payoutStatus: v.optional(payoutStatus),
     })
       .index("userId", ["userId"])
-      .index("programId", ["programId"]),
+      .index("programId", ["programId"])
+      .index("teacherId", ["teacherId"]),
 
     // Access granted once an order is paid.
     enrollments: defineTable({
@@ -126,6 +143,7 @@ const schema = defineSchema(
       topic: v.string(),
       startsAt: v.number(),
       status: bookingStatus,
+      meetingUrl: v.optional(v.string()), // video room for the session
     }).index("userId", ["userId"]),
 
     // Direct member-to-member messages.

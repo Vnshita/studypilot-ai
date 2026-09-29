@@ -45,6 +45,7 @@ import {
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
+import { TeachingPanels } from "@/components/TeachingPanels";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -166,6 +167,9 @@ export default function Dashboard() {
                           <p className="mt-0.5 text-xs text-muted-foreground">
                             {booking.tutorName} · {formatSessionTime(booking.startsAt)}
                           </p>
+                          {booking.meetingUrl && (
+                            <MeetingLink url={booking.meetingUrl} startsAt={booking.startsAt} />
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -218,6 +222,10 @@ export default function Dashboard() {
               </Card>
             </aside>
           </div>
+        )}
+
+        {user?.standing === "teacher" && (
+          <TeachingPanels />
         )}
 
         {user?.standing === "teacher" && (
