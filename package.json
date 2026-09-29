@@ -8,9 +8,19 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "icons": "bun scripts/generate-icons.mjs",
+    "store-assets": "bun scripts/generate-store-assets.mjs",
+    "cap:add:android": "bunx cap add android",
+    "cap:add:ios": "bunx cap add ios",
+    "cap:sync": "bun run build && bunx cap sync",
+    "cap:open:android": "bunx cap open android",
+    "cap:open:ios": "bunx cap open ios"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@convex-dev/auth": "^0.0.90",
     "@hookform/resolvers": "^5.2.2",
     "@jridgewell/trace-mapping": "^0.3.31",
@@ -71,6 +81,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
