@@ -17,6 +17,7 @@ const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const Catalog = lazy(() => import("./pages/Catalog.tsx"));
+const Library = lazy(() => import("./pages/Library.tsx"));
 const ProgramDetail = lazy(() => import("./pages/ProgramDetail.tsx"));
 const Checkout = lazy(() => import("./pages/Checkout.tsx"));
 const Community = lazy(() => import("./pages/Community.tsx"));
@@ -96,14 +97,16 @@ function MemberInit() {
   const { isAuthenticated } = useConvexAuth();
   const claimRole = useMutation(api.roles.claimRoleIfFirst);
   const seed = useMutation(api.programs.ensureSeeded);
+  const seedLibrary = useMutation(api.library.ensureSeeded);
   const [seeded, setSeeded] = React.useState(false);
 
   React.useEffect(() => {
     if (!seeded) {
       setSeeded(true);
       void seed({}).catch(() => undefined);
+      void seedLibrary({}).catch(() => undefined);
     }
-  }, [seed, seeded]);
+  }, [seed, seedLibrary, seeded]);
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -158,6 +161,7 @@ createRoot(document.getElementById("root")!).render(
                 element={<AuthPage redirectAfterAuth="/dashboard" />}
               />
               <Route path="/catalog" element={<Catalog />} />
+              <Route path="/library" element={<Library />} />
               <Route path="/programs/:programId" element={<ProgramDetail />} />
               <Route
                 path="/checkout"

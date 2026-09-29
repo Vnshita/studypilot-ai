@@ -31,6 +31,16 @@ export const bookingStatus = v.union(
   v.literal("cancelled"),
 );
 
+export const memberStanding = v.union(
+  v.literal("student"),
+  v.literal("teacher"),
+);
+
+export const materialKind = v.union(
+  v.literal("textbook"),
+  v.literal("notes"),
+);
+
 const schema = defineSchema(
   {
     // default auth tables using convex auth.
@@ -45,6 +55,12 @@ const schema = defineSchema(
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
+
+      // How the member takes part in the house: learning, teaching, or both.
+      standing: v.optional(memberStanding),
+
+      // Short bio shown beside materials a teacher contributes.
+      bio: v.optional(v.string()),
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     // add other tables here
@@ -120,6 +136,20 @@ const schema = defineSchema(
       senderId: v.id("users"),
       body: v.string(),
     }).index("conversationId", ["conversationId"]),
+
+    // The library: textbooks and study material, organized by discipline.
+    materials: defineTable({
+      discipline: v.string(),
+      kind: materialKind,
+      title: v.string(),
+      description: v.string(),
+      fileUrl: v.optional(v.string()),
+      contributorId: v.id("users"),
+      contributorName: v.string(),
+      status: programStatus, // published / draft — same lifecycle as programs
+    })
+      .index("discipline", ["discipline"])
+      .index("contributorId", ["contributorId"]),
   },
   {
     schemaValidation: false,

@@ -9,26 +9,48 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
 import { formatPriceCents, formatSessionTime } from "@/lib/format";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
   ArrowUpRight,
+  BookOpen,
   CalendarClock,
   CreditCard,
   GraduationCap,
   Layers,
+  Loader2,
+  Plus,
+  Presentation,
   Sparkles,
+  Trash2,
 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const enrollments = useQuery(api.store.listForUser, {});
   const orders = useQuery(api.store.listOrdersForUser, {});
   const bookings = useQuery(api.booking.listForUser, {});
+  const myMaterials = useQuery(api.library.listMine, {});
 
   const isLoading =
     enrollments === undefined || orders === undefined || bookings === undefined;
@@ -52,13 +74,26 @@ export default function Dashboard() {
               Your programs, sessions, and receipts — all in the one place.
             </p>
           </div>
-          <Button asChild className="gap-2">
-            <Link to="/catalog">
-              <Sparkles className="size-4" />
-              Add another program
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {user?.standing === "teacher" && (
+              <Button asChild variant="outline" className="gap-2">
+                <Link to="/library">
+                  <BookOpen className="size-4" />
+                  The Library
+                </Link>
+              </Button>
+            )}
+            <Button asChild className="gap-2">
+              <Link to="/catalog">
+                <Sparkles className="size-4" />
+                Add another program
+              </Link>
+            </Button>
+          </div>
         </div>
+
+        <StandingCard standing={user?.standing ?? null} name={user?.name ?? null} />
+
 
         {isLoading ? (
           <div className="flex items-center justify-center py-24 text-muted-foreground">
@@ -183,6 +218,10 @@ export default function Dashboard() {
             </aside>
           </div>
         )}
+
+        {user?.standing === "teacher" && (
+          <TeachingStudio materials={myMaterials ?? []} name={user.name ?? null} />
+        )}
       </main>
 
       <SiteFooter />
@@ -248,5 +287,362 @@ function OrderProgramName({ programId }: { programId: string }) {
     <p className="text-sm font-medium">
       {program ? program.title : "Program enrollment"}
     </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Standing — learn, teach, or carry both ledgers
+// ---------------------------------------------------------------------------
+
+function StandingCard({
+  standing,
+  name,
+}: {
+  standing: "student" | "teacher" | null;
+  name: string | null;
+}) {
+  const setStanding = useMutation(api.membership.setStanding);
+  const [isSaving, setIsSaving] = useState<"student" | "teacher" | null>(null);
+
+  const choose = async (value: "student" | "teacher") => {
+    setIsSaving(value);
+    try {
+      await setStanding({ standing: value });
+      toast.success(
+        value === "teacher"
+          ? "Welcome to the common room — the teaching studio is open below."
+          : "You are enrolled as a student. Choose a program to begin.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save your choice.",
+      );
+    } finally {
+      setIsSaving(null);
+    }
+  };
+
+  return (
+    <div id="standing" className="mt-8 scroll-mt-24">
+      {standing === null ? (
+        <Card className="border-primary/25 bg-secondary/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <GraduationCap className="size-4 text-primary" />
+              How will you take part in the house?
+            </CardTitle>
+            <CardDescription>
+              You can change this at any time — many members do both.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col rounded-lg border border-border/80 bg-card p-5">
+              <p className="display text-lg font-semibold">Learn as a student</p>
+              <p className="mt-1.5 flex-1 text-sm leading-6 text-muted-foreground">
+                Enroll in programs, book one-on-one sessions, and take your
+                place in the Society.
+              </p>
+              <Button
+                className="mt-4"
+                disabled={isSaving !== null}
+                onClick={() => choose("student")}
+              >
+                {isSaving === "student" && (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                )}
+                I'm here to learn
+              </Button>
+            </div>
+            <div className="flex flex-col rounded-lg border border-border/80 bg-card p-5">
+              <p className="display text-lg font-semibold">Teach at the house</p>
+              <p className="mt-1.5 flex-1 text-sm leading-6 text-muted-foreground">
+                Contribute textbooks and study notes to the Library and share
+                your discipline with other members.
+              </p>
+              <Button
+                className="mt-4"
+                disabled={isSaving !== null}
+                onClick={() => choose("teacher")}
+              >
+                {isSaving === "teacher" && (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                )}
+                I'm here to teach
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/80 bg-card px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-md bg-secondary text-primary">
+              {standing === "teacher" ? (
+                <Presentation className="size-4" />
+              ) : (
+                <GraduationCap className="size-4" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                {standing === "teacher"
+                  ? `Teaching at the house${name ? `, ${name}` : ""}`
+                  : `Studying at the house${name ? `, ${name}` : ""}`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {standing === "teacher"
+                  ? "Your studio for the Library is below."
+                  : "Enroll in a program or book a session to begin."}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isSaving !== null}
+            onClick={() => choose(standing === "teacher" ? "student" : "teacher")}
+          >
+            Switch to {standing === "teacher" ? "student" : "teacher"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Teaching studio — contribute to the Library
+// ---------------------------------------------------------------------------
+
+interface StudioMaterial {
+  _id: string;
+  discipline: string;
+  kind: "textbook" | "notes";
+  title: string;
+}
+
+function TeachingStudio({
+  materials,
+  name,
+}: {
+  materials: StudioMaterial[];
+  name: string | null;
+}) {
+  const disciplines = useQuery(api.programs.listDisciplines, {});
+  const createMaterial = useMutation(api.library.create);
+  const removeMaterial = useMutation(api.library.remove);
+
+  const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    discipline: "",
+    kind: "textbook" as "textbook" | "notes",
+    title: "",
+    description: "",
+    fileUrl: "",
+  });
+
+  const shelfOptions = disciplines ?? [];
+
+  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await createMaterial({
+        discipline: form.discipline,
+        kind: form.kind,
+        title: form.title,
+        description: form.description,
+        fileUrl: form.fileUrl.trim() || undefined,
+      });
+      toast.success("Filed to the Library shelf.");
+      setForm({
+        discipline: "",
+        kind: "textbook",
+        title: "",
+        description: "",
+        fileUrl: "",
+      });
+      setOpen(false);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not add the material.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemove = async (id: string) => {
+    try {
+      await removeMaterial({ id: id as never });
+      toast.success("Withdrawn from the shelf.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not withdraw the item.",
+      );
+    }
+  };
+
+  return (
+    <section id="studio" className="mt-10 scroll-mt-24">
+      <Card>
+        <CardHeader className="flex-row items-start justify-between space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Presentation className="size-5 text-primary" />
+              Teaching studio
+            </CardTitle>
+            <CardDescription>
+              {name
+                ? `${name}, the Library is yours to stock. Textbooks link out to PDFs; notes are read in place.`
+                : "Stock the Library with textbooks and notes."}
+            </CardDescription>
+          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5">
+                <Plus className="size-3.5" />
+                Add material
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Add to the Library</DialogTitle>
+                <DialogDescription>
+                  Textbooks open as PDFs in a new window; study notes are read
+                  in place.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="m-kind">Type</Label>
+                    <Select
+                      value={form.kind}
+                      onValueChange={(v) =>
+                        setForm((f) => ({ ...f, kind: v as "textbook" | "notes" }))
+                      }
+                    >
+                      <SelectTrigger id="m-kind" className="w-full">
+                        <SelectValue placeholder="Choose a type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="textbook">Textbook (PDF)</SelectItem>
+                        <SelectItem value="notes">Study notes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="m-discipline">Discipline</Label>
+                    <Input
+                      id="m-discipline"
+                      value={form.discipline}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, discipline: e.target.value }))
+                      }
+                      placeholder="Mathematics"
+                      list="studio-disciplines"
+                      required
+                    />
+                    <datalist id="studio-disciplines">
+                      {shelfOptions.map((d) => (
+                        <option key={d} value={d} />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="m-title">Title</Label>
+                  <Input
+                    id="m-title"
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. House Notes: Reading a Proof Twice"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="m-description">
+                    {form.kind === "textbook"
+                      ? "Description"
+                      : "The notes themselves"}
+                  </Label>
+                  <Textarea
+                    id="m-description"
+                    value={form.description}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, description: e.target.value }))
+                    }
+                    rows={5}
+                    required
+                  />
+                </div>
+                {form.kind === "textbook" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="m-url">PDF link (https://…)</Label>
+                    <Input
+                      id="m-url"
+                      type="url"
+                      value={form.fileUrl}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, fileUrl: e.target.value }))
+                      }
+                      placeholder="https://example.com/textbook.pdf"
+                    />
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+                    File to the shelf
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          {materials.length === 0 ? (
+            <p className="py-4 text-sm leading-6 text-muted-foreground">
+              Nothing on the shelves under your name yet. A single well-made
+              sheet of notes outlives most lectures.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/70">
+              {materials.map((material) => (
+                <li
+                  key={material._id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3.5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    {material.kind === "textbook" ? (
+                      <BookOpen className="size-4 shrink-0 text-primary" />
+                    ) : (
+                      <Presentation className="size-4 shrink-0 text-primary" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{material.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {material.discipline} ·{" "}
+                        {material.kind === "textbook" ? "Textbook" : "Notes"}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => handleRemove(material._id)}
+                  >
+                    <Trash2 className="mr-1.5 size-3.5" />
+                    Withdraw
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </section>
   );
 }

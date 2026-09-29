@@ -14,9 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
 import { formatPriceCents } from "@/lib/format";
-import { useMutation, useQuery } from "convex/react";
-import {
+import { useMutation, useQuery } from "convex/react";import {
   CalendarClock,
+  BookOpen,
   CheckCircle2,
   Clock,
   GraduationCap,
@@ -28,6 +28,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -38,6 +39,71 @@ const CURRICULUM_TEMPLATE = [
   "Marked submissions: written work returned with tutor commentary",
   "Integration: a capstone review with your tutor, one on one",
 ];
+
+/** Library picks for this program's discipline, shown in the sidebar. */
+function LibraryShelf({ discipline }: { discipline: string }) {
+  const materials = useQuery(api.library.listByDiscipline, { discipline });
+
+  if (materials === undefined) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+    );
+  }
+
+  if (materials.length === 0) {
+    return (
+      <p className="text-sm leading-6 text-muted-foreground">
+        The {discipline} shelf is being stocked. Browse the{" "}
+        <Link
+          to="/library"
+          className="text-primary underline-offset-4 hover:underline"
+        >
+          full Library
+        </Link>
+        .
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <ul className="space-y-3">
+        {materials.slice(0, 3).map((material) => (
+          <li key={material._id} className="flex items-start gap-2.5">
+            {material.kind === "textbook" ? (
+              <BookOpen className="mt-0.5 size-4 shrink-0 text-primary" />
+            ) : (
+              <NotebookPen className="mt-0.5 size-4 shrink-0 text-primary" />
+            )}
+            {material.kind === "textbook" && material.fileUrl ? (
+              <a
+                href={material.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium leading-6 text-foreground underline-offset-4 hover:underline"
+              >
+                {material.title}
+              </a>
+            ) : (
+              <Link
+                to="/library"
+                className="text-sm font-medium leading-6 text-foreground underline-offset-4 hover:underline"
+              >
+                {material.title}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
+      <Button asChild variant="outline" className="mt-4 w-full">
+        <Link to="/library">Visit the Library</Link>
+      </Button>
+    </div>
+  );
+}
 
 export default function ProgramDetail() {
   const { programId } = useParams<{ programId: string }>();
@@ -266,6 +332,14 @@ export default function ProgramDetail() {
                 <GraduationCap className="size-4 text-primary" />
                 Private tutor review included at term's end
               </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">From the Library</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LibraryShelf discipline={program.discipline} />
             </CardContent>
           </Card>
           <Card>

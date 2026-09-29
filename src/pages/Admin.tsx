@@ -26,6 +26,7 @@ import { api } from "@/convex/_generated/api";
 import { formatPriceCents, formatSessionTimeShort } from "@/lib/format";
 import { useMutation, useQuery } from "convex/react";
 import {
+  BookMarked,
   BookOpen,
   GraduationCap,
   Loader2,
@@ -107,6 +108,10 @@ export default function Admin() {
               <Users className="size-3.5" />
               Members
             </TabsTrigger>
+            <TabsTrigger value="library" className="gap-1.5">
+              <BookMarked className="size-3.5" />
+              Library
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="programs" className="mt-6">
@@ -117,6 +122,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="members" className="mt-6">
             <MembersTab />
+          </TabsContent>
+          <TabsContent value="library" className="mt-6">
+            <LibraryAdminTab />
           </TabsContent>
         </Tabs>
       </main>
@@ -462,6 +470,76 @@ function OrderRow({
         )}
       </div>
     </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Library
+// ---------------------------------------------------------------------------
+
+function LibraryAdminTab() {
+  const materials = useQuery(api.library.listAll, {});
+  const removeMaterial = useMutation(api.library.adminRemove);
+
+  const handleRemove = async (id: string) => {
+    try {
+      await removeMaterial({ id: id as never });
+      toast.success("Removed from the shelf.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not remove the item.",
+      );
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>The Library</CardTitle>
+        <CardDescription>
+          Every textbook and note on the shelves, including members'
+          contributions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {materials === undefined ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : materials.length === 0 ? (
+          <p className="py-6 text-sm text-muted-foreground">
+            The shelves are empty. Seed content appears when the first member
+            joins.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border/70">
+            {materials.map((material) => (
+              <li
+                key={material._id}
+                className="flex flex-wrap items-center justify-between gap-3 py-4"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{material.title}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {material.discipline} ·{" "}
+                    {material.kind === "textbook" ? "Textbook" : "Notes"} · filed
+                    by {material.contributorName}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => handleRemove(material._id)}
+                >
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

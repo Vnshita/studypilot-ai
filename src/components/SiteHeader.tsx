@@ -7,6 +7,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
 const NAV_ITEMS = [
   { to: "/catalog", label: "Catalog" },
+  { to: "/library", label: "Library" },
   { to: "/dashboard", label: "My Studies" },
   { to: "/community", label: "Society" },
   { to: "/messages", label: "Messages" },
