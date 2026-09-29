@@ -99,6 +99,7 @@ function MemberInit() {
   const claimRole = useMutation(api.roles.claimRoleIfFirst);
   const seed = useMutation(api.programs.ensureSeeded);
   const seedLibrary = useMutation(api.library.ensureSeeded);
+  const repairLinks = useMutation(api.library.repairLinks);
   const [seeded, setSeeded] = React.useState(false);
 
   React.useEffect(() => {
@@ -106,8 +107,10 @@ function MemberInit() {
       setSeeded(true);
       void seed({}).catch(() => undefined);
       void seedLibrary({}).catch(() => undefined);
+      // One-time fix for OpenStax links that rotted after earlier seeds.
+      void repairLinks({}).catch(() => undefined);
     }
-  }, [seed, seedLibrary, seeded]);
+  }, [seed, seedLibrary, repairLinks, seeded]);
 
   React.useEffect(() => {
     if (isAuthenticated) {

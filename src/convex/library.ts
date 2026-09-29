@@ -181,6 +181,63 @@ export const ensureSeeded = mutation({
   },
 });
 
+/**
+ * Repairs rows seeded with earlier, now-dead OpenStax URLs. OpenStax moved
+ * files to assets.openstax.org with slug-based names; the old cloudfront
+ * bucket paths serve an AccessDenied XML that browsers cannot render.
+ * Idempotent: only touches rows whose fileUrl matches a known-dead host.
+ */
+export const repairLinks = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const deadHost = "d3bxy9euw4e147.cloudfront.net";
+    const deadMirror = "kfe.khmnu.edu.ua";
+
+    const replacements: Record<string, string> = {
+      "CalculusVolume1-OP.pdf":
+        "https://assets.openstax.org/oscms-prodcms/media/documents/calculus-volume-1_-_WEB.pdf",
+      "CalculusVolume2-OP.pdf":
+        "https://assets.openstax.org/oscms-prodcms/media/documents/calculus-volume-2_-_WEB.pdf",
+      "Precalculus-OP.pdf":
+        "https://assets.openstax.org/oscms-prodcms/media/documents/precalculus-2e_-_WEB.pdf",
+      "IntroductoryStatistics-OP.pdf":
+        "https://assets.openstax.org/oscms-prodcms/media/documents/introductory-statistics-2e_-_WEB.pdf",
+      "CollegePhysics-OP.pdf":
+        "https://assets.openstax.org/oscms-prodcms/media/documents/college-physics-2e_-_WEB.pdf",
+      "UniversityPhysicsVolume1-OP.pdf":
+        "https://assets.openstax.org/oscms-prodcms/media/documents/university-physics-volume-1_-_WEB.pdf",
+      "Chemistry2e-OP.pdf":
+        "https://assets.openstax.org/oscms-prodcms/media/documents/chemistry-2e_-_WEB.pdf",
+      "AnatomyAndPhysiology-OP.pdf":
+        "https://assets.openstax.org/oscms-prodcms/media/documents/anatomy-and-physiology-2e_-_WEB.pdf",
+    };
+
+    const materials = await ctx.db.query("materials").collect();
+    let repaired = 0;
+    for (const material of materials) {
+      if (!material.fileUrl) continue;
+      const isDead =
+        material.fileUrl.includes(deadHost) ||
+        material.fileUrl.includes(deadMirror);
+      if (!isDead) continue;
+
+      const filename = material.fileUrl.split("/").pop() ?? "";
+      const replacement =
+        replacements[filename] ??
+        // Economics has no direct PDF anymore; use the official book page.
+        (material.title.includes("Economics")
+          ? "https://openstax.org/details/books/principles-of-economics-3e"
+          : null);
+      if (!replacement) continue;
+
+      await ctx.db.patch(material._id, { fileUrl: replacement });
+      repaired++;
+    }
+
+    return { repaired };
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Seed content — open textbooks (CC-licensed PDFs) plus house notes.
 // Links verified reachable at build time; all free and legal to distribute.
@@ -210,7 +267,7 @@ const SEED: SeedMaterial[] = [
     description:
       "The standard first volume: limits, derivatives, and the integral, with worked examples throughout. Free and openly licensed.",
     fileUrl:
-      "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/CalculusVolume1-OP.pdf",
+      "https://assets.openstax.org/oscms-prodcms/media/documents/calculus-volume-1_-_WEB.pdf",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -221,7 +278,7 @@ const SEED: SeedMaterial[] = [
     description:
       "Integration techniques, sequences and series, parametric and polar curves — the continuation of Volume 1.",
     fileUrl:
-      "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/CalculusVolume2-OP.pdf",
+      "https://assets.openstax.org/oscms-prodcms/media/documents/calculus-volume-2_-_WEB.pdf",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -232,7 +289,7 @@ const SEED: SeedMaterial[] = [
     description:
       "Algebra, trigonometry, and the functions family — the groundwork every program here assumes you can lean on.",
     fileUrl:
-      "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/Precalculus-OP.pdf",
+      "https://assets.openstax.org/oscms-prodcms/media/documents/precalculus-2e_-_WEB.pdf",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -243,7 +300,7 @@ const SEED: SeedMaterial[] = [
     description:
       "From descriptive statistics through inference, with real datasets. Companion to the Statistical Judgment program.",
     fileUrl:
-      "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/IntroductoryStatistics-OP.pdf",
+      "https://assets.openstax.org/oscms-prodcms/media/documents/introductory-statistics-2e_-_WEB.pdf",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -274,7 +331,7 @@ const SEED: SeedMaterial[] = [
     description:
       "Algebra-based physics from mechanics through modern physics, written for students meeting the subject seriously for the first time.",
     fileUrl:
-      "https://kfe.khmnu.edu.ua/wp-content/uploads/sites/69/2025/01/college_physics_2e-web_7zesafu___2022__c.pdf",
+      "https://assets.openstax.org/oscms-prodcms/media/documents/college-physics-2e_-_WEB.pdf",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -285,7 +342,7 @@ const SEED: SeedMaterial[] = [
     description:
       "Calculus-based mechanics, waves, and thermodynamics — the deeper treatment for members in the physics programs.",
     fileUrl:
-      "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/UniversityPhysicsVolume1-OP.pdf",
+      "https://assets.openstax.org/oscms-prodcms/media/documents/university-physics-volume-1_-_WEB.pdf",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -307,7 +364,7 @@ const SEED: SeedMaterial[] = [
     description:
       "General chemistry: structure, bonding, thermodynamics, and kinetics, with strong problem sets. Foundation for Organic Reaction Logic.",
     fileUrl:
-      "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/Chemistry2e-OP.pdf",
+      "https://assets.openstax.org/oscms-prodcms/media/documents/chemistry-2e_-_WEB.pdf",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -378,9 +435,8 @@ const SEED: SeedMaterial[] = [
     kind: "textbook",
     title: "Principles of Economics 3e (OpenStax)",
     description:
-      "Micro and macro in one volume: supply, elasticity, market structures, and the macro aggregates, with current examples.",
-    fileUrl:
-      "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/PrinciplesofEconomics-OP.pdf",
+      "Micro and macro in one volume: supply, elasticity, market structures, and the macro aggregates, with current examples. Open the page and choose “Download a PDF”.",
+    fileUrl: "https://openstax.org/details/books/principles-of-economics-3e",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
@@ -413,7 +469,7 @@ const SEED: SeedMaterial[] = [
     description:
       "Systems-based A&P from cells to organ systems, with clinical notes. Reliable reference for pre-medical members.",
     fileUrl:
-      "https://d3bxy9euw4e147.cloudfront.net/oscms-prodcms/media/documents/AnatomyAndPhysiology-OP.pdf",
+      "https://assets.openstax.org/oscms-prodcms/media/documents/anatomy-and-physiology-2e_-_WEB.pdf",
     contributorId: HOUSE,
     contributorName: "The House Library",
   },
